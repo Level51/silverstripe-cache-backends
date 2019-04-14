@@ -43,6 +43,7 @@ class Zend_Cache_Backend_Redis extends Zend_Cache_Backend implements Zend_Cache_
     const DEFAULT_HOST = '127.0.0.1';
     const DEFAULT_PORT =  6379;
     const DEFAULT_TIMEOUT =  0;
+    const DEFAULT_DB = 0;
 
     /**
      * Log message
@@ -57,6 +58,7 @@ class Zend_Cache_Backend_Redis extends Zend_Cache_Backend implements Zend_Cache_
      * 'host' => (string) : the name of the redis server
      * 'port' => (int) : the port of the redis server
      * 'timeout' => (int) : float, value in seconds (optional, default is 0 meaning unlimited)
+     * 'db' => (int) : int, the db index to select (default is 0)
      * =====> (array) client :
      * an array of redis client options ; the redis client is described by an associative array :
      * @see http://php.net/manual/memcached.constants.php
@@ -67,9 +69,10 @@ class Zend_Cache_Backend_Redis extends Zend_Cache_Backend implements Zend_Cache_
      */
     protected $_options = array(
         'server' => array(
-            'host'   => self::DEFAULT_HOST,
-            'port'   => self::DEFAULT_PORT,
-			'timeout' => self::DEFAULT_TIMEOUT
+            'host'    => self::DEFAULT_HOST,
+            'port'    => self::DEFAULT_PORT,
+            'timeout' => self::DEFAULT_TIMEOUT,
+            'db'      => self::DEFAULT_DB
         ),
         'client' => array()
     );
@@ -95,23 +98,10 @@ class Zend_Cache_Backend_Redis extends Zend_Cache_Backend implements Zend_Cache_
         }
 
         parent::__construct($options);
-
+        
         $this->_redis = new Redis();
 
-
-		$server = array();
-
-		$server = $this->_options['server'];
-		if (!array_key_exists('port', $server)){
-			$server['port'] = self::DEFAULT_PORT;
-        }
-		if (!array_key_exists('timeout', $server)) {
-            $server['timeout'] = self::DEFAULT_TIMEOUT;
-        }
-
-		$this->_redis->connect($server['host'], $server['port'], $server['timeout']);
-
-        // setup redis client options this occurs after connection due to this https://github.com/phpredis/phpredis/issues/504
+        // setup memcached client options
         foreach ($this->_options['client'] as $name => $value) {
             $optId = null;
             if (is_int($name)) {
@@ -130,6 +120,20 @@ class Zend_Cache_Backend_Redis extends Zend_Cache_Backend implements Zend_Cache_
                 }
             }
         }
+        
+        $server = $this->_options['server'];
+        if (!array_key_exists('port', $server)){
+            $server['port'] = self::DEFAULT_PORT;
+        }
+        if (!array_key_exists('timeout', $server)) {
+            $server['timeout'] = self::DEFAULT_TIMEOUT;
+        }
+        if (!array_key_exists('db', $server)) {
+            $server['db'] = self::DEFAULT_DB;
+        }
+        
+        $this->_redis->connect($server['host'], $server['port'], $server['timeout']);
+        $this->_redis->select($server['db']);
     }
 
     /**
@@ -356,7 +360,7 @@ class Zend_Cache_Backend_Redis extends Zend_Cache_Backend implements Zend_Cache_
     {
         $tmp = $this->_redis->get($id);
         if($tmp){
-			return $this->save($tmp, $id, array(), $extraLifetime);
+            return $this->save($tmp, $id, array(), $extraLifetime);
         }
         return false;
     }
